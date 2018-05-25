@@ -244,6 +244,7 @@ describe('Endpoints', () => {
         done();
       });
       it('Creates an axios delete call', (done) => {
+        console.log(api.base.callAuthSetup())
         server = http.createServer((req, res) => {
           res.setHeader('Content-Type', 'application/json;charset=utf-8');
           res.end();
@@ -388,6 +389,24 @@ describe('Endpoints', () => {
           });
         });
       });
+      it('Calls the authentication method if endpoint requires authentication', (done) => {
+        let authCalled = false
+        api.registerAuthSetup(() => { authCalled = true; return true; })
+        server = http.createServer((req, res) => {
+          res.setHeader('Content-Type', 'application/json;charset=utf-8');
+          res.end();
+        }).listen(PORT, () => {
+          api.base.get(1).then(response => {
+            expect(response.request.method).to.equal('GET');
+            expect(response.request.path).to.equal('/base/1');
+
+            expect(response).to.haveOwnProperty('status');
+            expect(response.status).to.equal(200);
+            expect(authCalled).to.equal(true);
+            done();
+          });
+        });
+      })
 
       // Failures
       it('Fails to generates parameters if none are passed and no pattern is found in the endpoint', (done) => {

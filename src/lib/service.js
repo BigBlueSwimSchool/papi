@@ -74,6 +74,10 @@ const PapiService = class {
     }
   }
 
+  callAuthSetup () { return true }
+
+  failedAuthSetup () { throw new Error('Papi wasn\'t able to setup authentication for the requested call.') }
+
   registerEndpoint (endpoint) {
     if (!endpoint) {
       throw new Error(`Service ${this._name} tried to register an endpoint but is missing arguments.`)
@@ -89,7 +93,16 @@ const PapiService = class {
 
     let index = this.endpoints.push(new PapiEndpoint({...endpoint, base: this._base})) - 1
 
-    this[endpoint.alias] = (params, body) => this.endpoints[index].call(params, body)
+    this[endpoint.alias] = (params, body) => this.callEndpoint(index, params, body)
+  }
+
+  callEndpoint (index, params, body) {
+    if (this.endpoints[index].requiresAuth) {
+      if (!this.callAuthSetup(this, this.endpoints[index])) {
+        this.failedAuthSetup()
+      }
+    }
+    return this.endpoints[index].call(params, body)
   }
 
   registerEndpoints (endpoints) {

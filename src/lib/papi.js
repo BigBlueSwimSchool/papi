@@ -10,6 +10,19 @@ const Papi = class {
     if (!args.base) {
       throw new Error('Missing API Base URL.')
     }
+
+    this.hookLocations = {
+      failedAuthSetup: PapiService.prototype
+    }
+
+    this.hookStack = {}
+
+    for (const hookName in this.hookLocations) {
+      if (this.hookLocations.hasOwnProperty(hookName)) {
+        this.hookStack[hookName] = []
+      }
+    }
+
     this._base = args.base
 
     if (args.services && Array.isArray(args.services)) {
@@ -27,6 +40,62 @@ const Papi = class {
         }
       }
     }
+
+    if (args.authSetup && typeof args.authSetup === 'function') {
+      this.registerAuthSetup(args.authSetup)
+    }
+  }
+
+  registerAuthSetup (authCallback) {
+    if (typeof authCallback !== 'function') {
+      throw new Error('Papi tried to register an authentication method but couldn\'t find a callback function.')
+    }
+
+    this.auth = authCallback
+    PapiService.prototype.auth = authCallback
+    PapiService.prototype.callAuthSetup = (service, endpoint) => PapiService.prototype.auth(this, service, endpoint)
+  }
+
+  registerHook (hookName, hookCallback) {
+    if (!hookName) {
+      throw new Error('Papi tried to register a new hook but is missing the hook name.')
+    }
+
+    if (typeof hookName !== 'string') {
+      throw new Error('Papi tried to register a new hook but the name passed wasn\'t a string.')
+    }
+
+    if (!hookCallback) {
+      throw new Error('Papi tried to register a new hook but is missing a callback.')
+    }
+
+    if (typeof hookCallback !== 'function') {
+      throw new Error('Papi tried to register a new hook but the callback given wasn\'t a function.')
+    }
+
+    if (this.hookLocations[hookName]) {
+      this.hookStack[hookName].push(this.hookLocations[hookName][hookName])
+      this.hookLocations[hookName][hookName] = hookCallback
+    } else {
+      throw new Error(`Papi couldn't find a hook with the name of ${hookName}.`)
+    }
+  }
+
+  deregisterHook (hookName) {
+    if (!hookName) {
+      throw new Error('Papi tried to deregister a hook but is missing the hook name.')
+    }
+
+    if (typeof hookName !== 'string') {
+      throw new Error('Papi tried to deregister a hook but the name given wasn\'t a string.')
+    }
+
+    if (typeof this.hookLocations[hookName] === 'undefined') {
+      throw new Error(`Papi tried to deregister the hook ${hookName} but it doesn't look like it exists.`)
+    }
+
+    const previousHook = this.hookStack[hookName].pop()
+    this.hookLocations[hookName][hookName] = previousHook
   }
 
   registerService (args) {
